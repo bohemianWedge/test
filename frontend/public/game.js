@@ -209,12 +209,8 @@ class GameClient {
         }
 
         if (keyHandled) {
-            if (this.inputState.shoot && !this.lastShootState) {
-                this.sendInput();
-            } else if (!this.inputState.shoot) {
-                this.sendInput();
-            }
-
+            // Always send input when any key state changes
+            this.sendInput();
             this.lastShootState = this.inputState.shoot;
         }
     }

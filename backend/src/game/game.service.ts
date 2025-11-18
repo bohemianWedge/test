@@ -137,7 +137,8 @@ export class GameService {
   }
 
   update(): GameState {
-    if (!this.gameState.gameStarted || this.gameState.winner) {
+    // Only stop updates if there's a winner, but allow updates even with 1 player
+    if (this.gameState.winner) {
       return this.getGameState();
     }
 
@@ -159,8 +160,10 @@ export class GameService {
     // Update player effects
     this.updatePlayerEffects();
 
-    // Check win condition
-    this.checkWinCondition();
+    // Only check win condition when game has started (both players present)
+    if (this.gameState.gameStarted) {
+      this.checkWinCondition();
+    }
 
     return this.getGameState();
   }

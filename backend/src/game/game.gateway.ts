@@ -47,7 +47,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Send current game state
       const gameState = this.gameService.getGameState();
-      client.emit('gameState', this.serializeGameState(gameState));
+
+      // Broadcast to all clients to ensure everyone sees the new player immediately
+      this.broadcastGameState(gameState);
 
       // Notify other players
       client.broadcast.emit('playerConnected', {
