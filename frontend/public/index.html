@@ -17,6 +17,17 @@
         </div>
     </div>
 
+    <h1>🎮 2D Puzzle Battle Game</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <div id="controls">
+            <div class="info">
+                <span class="player1-color">🔥 Joueur 1 (Feu):</span> WASD (déplacement) + E (tir)
+            </div>
+            <div class="info">
+                <span class="player2-color">💧 Joueur 2 (Eau):</span> Flèches (déplacement) + Entrée (tir)
     <!-- Header -->
     <header class="header">
         <div class="header-content">
@@ -55,9 +66,19 @@
                     Affrontez un autre joueur en ligne. Chacun joue sur son propre appareil.
                 </p>
             </div>
+            <div class="info" style="margin-top: 10px; color: #FFD700; font-weight: bold;">
+                ⚠️ Attention: Évitez les plateformes de l'élément adverse!<br>
+                🔥 Feu meurt sur 💧 Eau | 💧 Eau meurt sur 🔥 Feu
+            </div>
         </div>
     </div>
 
+        <div class="legend">
+            <div class="legend-title">Types de plateformes:</div>
+            <span class="platform-type fire">🔥 Feu</span> - Tue joueur Eau
+            <span class="platform-type water">💧 Eau</span> - Tue joueur Feu
+            <span class="platform-type neutral">▪️ Neutre</span> - Sûr pour tous
+        </div>
     <!-- Main Content -->
     <main class="main-container">
         <div id="gameContainer">

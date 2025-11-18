@@ -14,6 +14,7 @@ export interface Player {
   height: number;
   hasFinished: boolean;
   color: string;
+  element: 'fire' | 'water'; // Player's element - determines safe platforms
   currentPlatformType?: 'solid' | 'water' | 'fire' | 'neutral' | 'ice';
   lastDamageTime?: number;
   isInvincible?: boolean;
