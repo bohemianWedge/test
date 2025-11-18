@@ -78,12 +78,26 @@ export interface Level {
   spawnPoints: Vector2[];
 }
 
+export interface PlayerScore {
+  playerId: string;
+  playerName: string;
+  wins: number;
+  losses: number;
+  lastWin?: number; // timestamp
+}
+
+export interface ScoreData {
+  scores: Map<string, PlayerScore>;
+  totalGames: number;
+}
+
 export interface GameState {
   players: Map<string, Player>;
   projectiles: Projectile[];
   level: Level;
   gameStarted: boolean;
   winner: string | null;
+  scores: Map<string, PlayerScore>;
 }
 
 export interface InputState {

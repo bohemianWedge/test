@@ -9,6 +9,7 @@ import { LEVELS } from './levels';
 import { GAME_CONFIG } from './game.config';
 import { PhysicsService } from './physics.service';
 import { CollisionService } from './collision.service';
+import { ScoreService } from './score.service';
 
 @Injectable()
 export class GameService {
@@ -17,6 +18,7 @@ export class GameService {
   constructor(
     private physicsService: PhysicsService,
     private collisionService: CollisionService,
+    private scoreService: ScoreService,
   ) {
     this.initializeGame();
   }
@@ -28,6 +30,7 @@ export class GameService {
       level: LEVELS[0],
       gameStarted: false,
       winner: null,
+      scores: this.scoreService.getScores(),
     };
   }
 
@@ -343,6 +346,17 @@ export class GameService {
         player.hasFinished = true;
         if (!this.gameState.winner) {
           this.gameState.winner = player.id;
+
+          // Record the win/loss in scores
+          const playerIds = Array.from(this.gameState.players.keys());
+          const loserId = playerIds.find(id => id !== player.id);
+
+          if (loserId) {
+            this.scoreService.recordWin(player.id, loserId);
+
+            // Update game state scores
+            this.gameState.scores = this.scoreService.getScores();
+          }
         }
       }
     });
@@ -361,10 +375,38 @@ export class GameService {
     return {
       ...this.gameState,
       players: new Map(this.gameState.players),
+      scores: new Map(this.gameState.scores),
     };
   }
 
   resetGame() {
+    // Keep existing player connections but reset game state
+    const existingPlayers = new Map(this.gameState.players);
+
     this.initializeGame();
+
+    // Restore player connections
+    existingPlayers.forEach((player, playerId) => {
+      const playerCount = this.gameState.players.size;
+      const spawnPoint = this.gameState.level.spawnPoints[playerCount];
+
+      const resetPlayer: Player = {
+        ...player,
+        position: { x: spawnPoint.x, y: spawnPoint.y },
+        velocity: { x: 0, y: 0 },
+        hasFinished: false,
+        isGrounded: false,
+        isInvincible: false,
+        effects: [],
+        lastDamageTime: 0,
+      };
+
+      this.gameState.players.set(playerId, resetPlayer);
+    });
+
+    // Update game started status
+    if (this.gameState.players.size === GAME_CONFIG.MAX_PLAYERS) {
+      this.gameState.gameStarted = true;
+    }
   }
 }
