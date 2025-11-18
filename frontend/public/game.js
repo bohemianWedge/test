@@ -1,3 +1,74 @@
+// Asset Loader
+class AssetLoader {
+    constructor() {
+        this.assets = {
+            player1Sprite: null,
+            player2Sprite: null,
+            backgroundImage: null,
+            textures: {
+                neutral: null,
+                fire: null,
+                water: null,
+                ice: null
+            }
+        };
+        this.loadingComplete = false;
+        this.assetsToLoad = 0;
+        this.assetsLoaded = 0;
+    }
+
+    async loadAllAssets() {
+        const assetPaths = [
+            { key: 'player1Sprite', path: 'assets/sprites/player1.png' },
+            { key: 'player2Sprite', path: 'assets/sprites/player2.png' },
+            { key: 'backgroundImage', path: 'assets/backgrounds/background.png' },
+            { key: 'texture_neutral', path: 'assets/textures/platform_neutral.png' },
+            { key: 'texture_fire', path: 'assets/textures/platform_fire.png' },
+            { key: 'texture_water', path: 'assets/textures/platform_water.png' },
+            { key: 'texture_ice', path: 'assets/textures/platform_ice.png' }
+        ];
+
+        this.assetsToLoad = assetPaths.length;
+
+        const promises = assetPaths.map(asset => this.loadImage(asset.key, asset.path));
+
+        await Promise.allSettled(promises);
+        this.loadingComplete = true;
+        console.log(`Assets loaded: ${this.assetsLoaded}/${this.assetsToLoad}`);
+    }
+
+    loadImage(key, path) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                if (key.startsWith('texture_')) {
+                    const textureName = key.replace('texture_', '');
+                    this.assets.textures[textureName] = img;
+                } else {
+                    this.assets[key] = img;
+                }
+                this.assetsLoaded++;
+                console.log(`Loaded: ${path}`);
+                resolve();
+            };
+            img.onerror = () => {
+                console.warn(`Failed to load: ${path} - Will use default rendering`);
+                this.assetsLoaded++;
+                resolve(); // Don't reject, just continue without the asset
+            };
+            img.src = path;
+        });
+    }
+
+    getAsset(key) {
+        return this.assets[key];
+    }
+
+    getTexture(type) {
+        return this.assets.textures[type];
+    }
+}
+
 // Particle System
 class Particle {
     constructor(x, y, vx, vy, color, lifetime) {
@@ -84,10 +155,15 @@ class GameClient {
         this.animationTime = 0;
         this.cameraShake = { x: 0, y: 0, intensity: 0 };
 
+        // Asset loader
+        this.assetLoader = new AssetLoader();
+
         this.init();
     }
 
-    init() {
+    async init() {
+        // Load assets first
+        await this.assetLoader.loadAllAssets();
         this.setupModeSelection();
         this.setupRestartButton();
         this.startRenderLoop();
@@ -462,21 +538,28 @@ class GameClient {
     }
 
     drawBackground() {
-        // Gradient background
-        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        gradient.addColorStop(0, '#0f3460');
-        gradient.addColorStop(0.5, '#16213e');
-        gradient.addColorStop(1, '#0f3460');
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const backgroundImage = this.assetLoader.getAsset('backgroundImage');
 
-        // Animated stars
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        for (let i = 0; i < 50; i++) {
-            const x = (i * 73 + this.animationTime * 0.1) % this.canvas.width;
-            const y = (i * 127) % this.canvas.height;
-            const size = (Math.sin(this.animationTime * 0.05 + i) + 1) * 0.5 + 0.5;
-            this.ctx.fillRect(x, y, size, size);
+        if (backgroundImage) {
+            // Draw custom background image
+            this.ctx.drawImage(backgroundImage, 0, 0, this.canvas.width, this.canvas.height);
+        } else {
+            // Fallback to gradient background
+            const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            gradient.addColorStop(0, '#0f3460');
+            gradient.addColorStop(0.5, '#16213e');
+            gradient.addColorStop(1, '#0f3460');
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Animated stars
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 73 + this.animationTime * 0.1) % this.canvas.width;
+                const y = (i * 127) % this.canvas.height;
+                const size = (Math.sin(this.animationTime * 0.05 + i) + 1) * 0.5 + 0.5;
+                this.ctx.fillRect(x, y, size, size);
+            }
         }
     }
 
@@ -497,68 +580,80 @@ class GameClient {
         level.platforms.forEach(platform => {
             this.ctx.save();
 
-            switch (platform.type) {
-                case 'fire':
-                    // Animated fire platform
-                    const fireGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    const fireFlicker = Math.sin(this.animationTime * 0.1) * 0.2 + 0.8;
-                    fireGradient.addColorStop(0, `rgba(255, 107, 107, ${fireFlicker})`);
-                    fireGradient.addColorStop(1, '#E74C3C');
-                    this.ctx.fillStyle = fireGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            // Get texture based on platform type
+            const platformType = platform.type || 'neutral';
+            const texture = this.assetLoader.getTexture(platformType);
 
-                    // Fire particles on top
-                    if (Math.random() < 0.3) {
-                        this.particles.push(new Particle(
-                            platform.x + Math.random() * platform.width,
-                            platform.y,
-                            (Math.random() - 0.5) * 0.5,
-                            -Math.random() * 2 - 1,
-                            '#FF6B6B',
-                            20
-                        ));
-                    }
-                    break;
+            if (texture) {
+                // Draw with custom texture using pattern
+                const pattern = this.ctx.createPattern(texture, 'repeat');
+                this.ctx.fillStyle = pattern;
+                this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            } else {
+                // Fallback to gradient rendering
+                switch (platform.type) {
+                    case 'fire':
+                        // Animated fire platform
+                        const fireGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        const fireFlicker = Math.sin(this.animationTime * 0.1) * 0.2 + 0.8;
+                        fireGradient.addColorStop(0, `rgba(255, 107, 107, ${fireFlicker})`);
+                        fireGradient.addColorStop(1, '#E74C3C');
+                        this.ctx.fillStyle = fireGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                        break;
 
-                case 'water':
-                    // Animated water platform
-                    const waterGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    waterGradient.addColorStop(0, '#4ECDC4');
-                    waterGradient.addColorStop(1, '#3AAFA9');
-                    this.ctx.fillStyle = waterGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    case 'water':
+                        // Animated water platform
+                        const waterGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        waterGradient.addColorStop(0, '#4ECDC4');
+                        waterGradient.addColorStop(1, '#3AAFA9');
+                        this.ctx.fillStyle = waterGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
 
-                    // Water wave effect
-                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.beginPath();
-                    for (let x = 0; x < platform.width; x += 5) {
-                        const y = Math.sin((x + this.animationTime) * 0.1) * 2;
-                        if (x === 0) {
-                            this.ctx.moveTo(platform.x + x, platform.y + 5 + y);
-                        } else {
-                            this.ctx.lineTo(platform.x + x, platform.y + 5 + y);
+                        // Water wave effect
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        for (let x = 0; x < platform.width; x += 5) {
+                            const y = Math.sin((x + this.animationTime) * 0.1) * 2;
+                            if (x === 0) {
+                                this.ctx.moveTo(platform.x + x, platform.y + 5 + y);
+                            } else {
+                                this.ctx.lineTo(platform.x + x, platform.y + 5 + y);
+                            }
                         }
-                    }
-                    this.ctx.stroke();
-                    break;
+                        this.ctx.stroke();
+                        break;
 
-                default:
-                    // Regular platform with texture
-                    const neutralGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    neutralGradient.addColorStop(0, '#95A5A6');
-                    neutralGradient.addColorStop(1, '#7F8C8D');
-                    this.ctx.fillStyle = neutralGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    default:
+                        // Regular platform with texture
+                        const neutralGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        neutralGradient.addColorStop(0, '#95A5A6');
+                        neutralGradient.addColorStop(1, '#7F8C8D');
+                        this.ctx.fillStyle = neutralGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                }
+            }
+
+            // Fire particles on top for fire platforms
+            if (platform.type === 'fire' && Math.random() < 0.3) {
+                this.particles.push(new Particle(
+                    platform.x + Math.random() * platform.width,
+                    platform.y,
+                    (Math.random() - 0.5) * 0.5,
+                    -Math.random() * 2 - 1,
+                    '#FF6B6B',
+                    20
+                ));
             }
 
             // Enhanced border
@@ -651,39 +746,55 @@ class GameClient {
                 });
             }
 
-            // Draw player with gradient
-            const gradient = this.ctx.createLinearGradient(
-                player.position.x, player.position.y,
-                player.position.x, player.position.y + player.height
-            );
-            gradient.addColorStop(0, player.color);
-            gradient.addColorStop(1, this.darkenColor(player.color, 0.3));
-            this.ctx.fillStyle = gradient;
+            // Get player sprite
+            const playerSprite = index === 0
+                ? this.assetLoader.getAsset('player1Sprite')
+                : this.assetLoader.getAsset('player2Sprite');
 
-            // Round corners
-            this.roundRect(
-                player.position.x,
-                player.position.y,
-                player.width,
-                player.height,
-                5
-            );
-            this.ctx.fill();
+            if (playerSprite) {
+                // Draw custom sprite
+                this.ctx.drawImage(
+                    playerSprite,
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height
+                );
+            } else {
+                // Fallback to gradient rendering
+                const gradient = this.ctx.createLinearGradient(
+                    player.position.x, player.position.y,
+                    player.position.x, player.position.y + player.height
+                );
+                gradient.addColorStop(0, player.color);
+                gradient.addColorStop(1, this.darkenColor(player.color, 0.3));
+                this.ctx.fillStyle = gradient;
 
-            // Border with glow
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 2;
-            this.ctx.shadowBlur = 5;
-            this.ctx.shadowColor = 'white';
-            this.roundRect(
-                player.position.x,
-                player.position.y,
-                player.width,
-                player.height,
-                5
-            );
-            this.ctx.stroke();
-            this.ctx.shadowBlur = 0;
+                // Round corners
+                this.roundRect(
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height,
+                    5
+                );
+                this.ctx.fill();
+
+                // Border with glow
+                this.ctx.strokeStyle = 'white';
+                this.ctx.lineWidth = 2;
+                this.ctx.shadowBlur = 5;
+                this.ctx.shadowColor = 'white';
+                this.roundRect(
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height,
+                    5
+                );
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+            }
 
             // Direction indicator with animation
             this.ctx.fillStyle = 'white';

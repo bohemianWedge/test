@@ -144,6 +144,69 @@ Ce projet respecte les exigences de ft_transcendence :
 - ✅ Support multijoueur
 - ✅ Sécurité de base (CORS, validation)
 
+## 🎨 Personnalisation des Sprites
+
+Le jeu supporte maintenant les sprites et textures personnalisés ! Vous pouvez remplacer l'apparence des joueurs, des plateformes et du fond.
+
+### 📁 Structure des dossiers
+
+```
+frontend/public/assets/
+├── sprites/              # Sprites des joueurs
+│   ├── player1.png      # Sprite du joueur 1 (recommandé: 30x40 px)
+│   └── player2.png      # Sprite du joueur 2 (recommandé: 30x40 px)
+├── textures/            # Textures des plateformes
+│   ├── platform_neutral.png  # Plateforme normale (tileable)
+│   ├── platform_fire.png     # Plateforme de feu (tileable)
+│   ├── platform_water.png    # Plateforme d'eau (tileable)
+│   └── platform_ice.png      # Plateforme de glace (tileable)
+└── backgrounds/         # Images de fond
+    └── background.png   # Fond du jeu (800x600 px)
+```
+
+### 🖼️ Comment ajouter vos sprites
+
+1. **Sprites des joueurs**
+   - Créez deux images PNG pour vos joueurs
+   - Dimensions recommandées : **30x40 pixels** (largeur x hauteur)
+   - Nommez-les `player1.png` et `player2.png`
+   - Placez-les dans `frontend/public/assets/sprites/`
+
+2. **Textures des plateformes**
+   - Créez des images PNG qui se répètent (tileable)
+   - Dimensions recommandées : **32x32 pixels** ou **64x64 pixels**
+   - Types disponibles :
+     - `platform_neutral.png` - Plateforme normale
+     - `platform_fire.png` - Plateforme de feu
+     - `platform_water.png` - Plateforme d'eau
+     - `platform_ice.png` - Plateforme de glace
+   - Placez-les dans `frontend/public/assets/textures/`
+
+3. **Fond d'écran**
+   - Créez une image PNG pour le fond
+   - Dimensions recommandées : **800x600 pixels**
+   - Nommez-la `background.png`
+   - Placez-la dans `frontend/public/assets/backgrounds/`
+
+### 💡 Notes importantes
+
+- **Format** : Utilisez le format PNG pour la transparence
+- **Fallback** : Si un sprite n'est pas trouvé, le jeu utilisera le rendu par défaut
+- **Performance** : Des sprites trop grands peuvent affecter les performances
+- **Tileable** : Les textures de plateformes doivent se répéter sans couture visible
+
+### 🎨 Exemples de dimensions
+
+| Asset | Dimensions recommandées | Format |
+|-------|------------------------|--------|
+| Player 1 & 2 | 30x40 px | PNG |
+| Textures plateformes | 32x32 ou 64x64 px | PNG (tileable) |
+| Fond d'écran | 800x600 px | PNG/JPG |
+
+### 🔄 Rechargement
+
+Les sprites sont chargés au démarrage du jeu. Si vous ajoutez ou modifiez des sprites, **rechargez la page** (F5) pour voir les changements.
+
 ## 🎯 Améliorations futures
 
 - Système d'authentification
