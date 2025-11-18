@@ -1,3 +1,79 @@
+// Asset Loader
+class AssetLoader {
+    constructor() {
+        this.assets = {
+            player1Sprite: null,
+            player2Sprite: null,
+            backgroundImage: null,
+            textures: {
+                neutral: null,
+                fire: null,
+                water: null,
+                ice: null
+            }
+        };
+        this.loadingComplete = false;
+        this.assetsToLoad = 0;
+        this.assetsLoaded = 0;
+    }
+
+    async loadAllAssets() {
+        const assetPaths = [
+            { key: 'player1Sprite', path: 'assets/sprites/player1.png' },
+            { key: 'player2Sprite', path: 'assets/sprites/player2.png' },
+            { key: 'backgroundImage', path: 'assets/backgrounds/background.png' },
+            { key: 'texture_neutral', path: 'assets/textures/platform_neutral.png' },
+            { key: 'texture_fire', path: 'assets/textures/platform_fire.png' },
+            { key: 'texture_water', path: 'assets/textures/platform_water.png' },
+            { key: 'texture_ice', path: 'assets/textures/platform_ice.png' }
+        ];
+
+        this.assetsToLoad = assetPaths.length;
+
+        const promises = assetPaths.map(asset => this.loadImage(asset.key, asset.path));
+
+        await Promise.allSettled(promises);
+        this.loadingComplete = true;
+        console.log(`Assets loaded: ${this.assetsLoaded}/${this.assetsToLoad}`);
+    }
+
+    getLoadingProgress() {
+        if (this.assetsToLoad === 0) return 0;
+        return Math.round((this.assetsLoaded / this.assetsToLoad) * 100);
+    }
+
+    loadImage(key, path) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                if (key.startsWith('texture_')) {
+                    const textureName = key.replace('texture_', '');
+                    this.assets.textures[textureName] = img;
+                } else {
+                    this.assets[key] = img;
+                }
+                this.assetsLoaded++;
+                console.log(`Loaded: ${path}`);
+                resolve();
+            };
+            img.onerror = () => {
+                console.warn(`Failed to load: ${path} - Will use default rendering`);
+                this.assetsLoaded++;
+                resolve(); // Don't reject, just continue without the asset
+            };
+            img.src = path;
+        });
+    }
+
+    getAsset(key) {
+        return this.assets[key];
+    }
+
+    getTexture(type) {
+        return this.assets.textures[type];
+    }
+}
+
 // Particle System
 class Particle {
     constructor(x, y, vx, vy, color, lifetime) {
@@ -84,13 +160,55 @@ class GameClient {
         this.animationTime = 0;
         this.cameraShake = { x: 0, y: 0, intensity: 0 };
 
+        // Asset loader
+        this.assetLoader = new AssetLoader();
+
         this.init();
     }
 
-    init() {
-        this.setupModeSelection();
-        this.setupRestartButton();
-        this.startRenderLoop();
+    async init() {
+        // Show loading screen and load assets
+        this.showLoadingScreen();
+
+        // Update loading progress
+        const progressInterval = setInterval(() => {
+            const progress = this.assetLoader.getLoadingProgress();
+            this.updateLoadingProgress(progress);
+        }, 100);
+
+        await this.assetLoader.loadAllAssets();
+
+        clearInterval(progressInterval);
+        this.updateLoadingProgress(100);
+
+        // Hide loading screen after a short delay
+        setTimeout(() => {
+            this.hideLoadingScreen();
+            this.setupModeSelection();
+            this.setupRestartButton();
+            this.startRenderLoop();
+        }, 500);
+    }
+
+    showLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('hidden');
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+        }
+    }
+
+    updateLoadingProgress(progress) {
+        const progressBar = document.getElementById('loadingProgressBar');
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
     }
 
     setupModeSelection() {
@@ -98,13 +216,12 @@ class GameClient {
         const localModeBtn = document.getElementById('localModeBtn');
         const onlineModeBtn = document.getElementById('onlineModeBtn');
         const gameContainer = document.getElementById('gameContainer');
-        const title = document.querySelector('h1');
 
         localModeBtn.addEventListener('click', () => {
             this.gameMode = 'local';
             modeSelection.classList.add('hidden');
             gameContainer.classList.add('active');
-            title.classList.add('active');
+            this.updateModeDisplay('Mode Local');
             this.startLocalMode();
         });
 
@@ -112,15 +229,38 @@ class GameClient {
             this.gameMode = 'online';
             modeSelection.classList.add('hidden');
             gameContainer.classList.add('active');
-            title.classList.add('active');
+            this.updateModeDisplay('Mode En Ligne');
             this.startOnlineMode();
         });
+    }
+
+    updateModeDisplay(mode) {
+        const currentMode = document.getElementById('currentMode');
+        if (currentMode) {
+            currentMode.textContent = `Mode: ${mode}`;
+        }
+    }
+
+    updateConnectionStatus(status) {
+        const connectionStatus = document.getElementById('connectionStatus');
+        if (connectionStatus) {
+            connectionStatus.textContent = status;
+            connectionStatus.style.color = status === 'Connecté' ? 'var(--success-color)' : 'var(--error-color)';
+        }
+    }
+
+    updatePlayerCount(count, total = 2) {
+        const playerCount = document.getElementById('playerCount');
+        if (playerCount) {
+            playerCount.textContent = `${count}/${total}`;
+        }
     }
 
     startLocalMode() {
         this.connectToServer();
         this.setupControls();
-        this.updateStatus('Mode local - Les deux joueurs peuvent jouer!');
+        this.updateStatus('Mode local - Les deux joueurs peuvent jouer!', 'info');
+        this.updatePlayerCount(2);
     }
 
     startOnlineMode() {
@@ -133,9 +273,23 @@ class GameClient {
         restartButton.addEventListener('click', () => {
             if (this.socket && this.socket.connected) {
                 this.socket.emit('resetGame');
-                restartButton.style.display = 'none';
+                this.hideRestartButton();
             }
         });
+    }
+
+    showRestartButton() {
+        const restartButton = document.getElementById('restartButton');
+        if (restartButton) {
+            restartButton.classList.add('active');
+        }
+    }
+
+    hideRestartButton() {
+        const restartButton = document.getElementById('restartButton');
+        if (restartButton) {
+            restartButton.classList.remove('active');
+        }
     }
 
     connectToServer() {
@@ -151,17 +305,19 @@ class GameClient {
 
         this.socket.on('connect', () => {
             console.log('Connected to server');
+            this.updateConnectionStatus('Connecté');
             if (this.gameMode === 'local') {
-                this.updateStatus('Mode local activé - Les deux joueurs peuvent jouer!');
+                this.updateStatus('Mode local activé - Les deux joueurs peuvent jouer!', 'success');
             } else {
-                this.updateStatus('Connecté au serveur');
+                this.updateStatus('Connecté au serveur', 'success');
             }
         });
 
         this.socket.on('playerJoined', (data) => {
             this.playerId = data.playerId;
             console.log('Joined as player:', this.playerId);
-            this.updateStatus('Vous avez rejoint la partie!');
+            this.updateStatus('Vous avez rejoint la partie!', 'success');
+            this.updatePlayerCount(1);
         });
 
         this.socket.on('gameState', (state) => {
@@ -178,34 +334,41 @@ class GameClient {
             }
 
             if (state.gameStarted && !state.winner) {
-                this.updateStatus('Partie en cours...');
-                document.getElementById('restartButton').style.display = 'none';
+                this.updateStatus('Partie en cours...', 'info');
+                this.hideRestartButton();
             } else if (state.winner) {
                 const isWinner = state.winner === this.playerId;
-                this.updateStatus(isWinner ? 'Vous avez gagné!' : 'Vous avez perdu');
-                document.getElementById('restartButton').style.display = 'block';
+                this.updateStatus(isWinner ? '🎉 Vous avez gagné!' : '😞 Vous avez perdu', isWinner ? 'success' : 'error');
+                this.showRestartButton();
+            }
+
+            // Update player count
+            if (state.players) {
+                this.updatePlayerCount(state.players.length);
             }
         });
 
         this.socket.on('gameReset', () => {
-            this.updateStatus('Nouvelle partie!');
-            document.getElementById('restartButton').style.display = 'none';
+            this.updateStatus('Nouvelle partie!', 'info');
+            this.hideRestartButton();
         });
 
         this.socket.on('playerConnected', () => {
-            this.updateStatus('Un joueur a rejoint la partie!');
+            this.updateStatus('Un joueur a rejoint la partie!', 'success');
         });
 
         this.socket.on('playerDisconnected', () => {
-            this.updateStatus('Un joueur s\'est déconnecté');
+            this.updateStatus('Un joueur s\'est déconnecté', 'warning');
+            this.updateConnectionStatus('Déconnecté');
         });
 
         this.socket.on('error', (data) => {
-            this.updateStatus('Erreur: ' + data.message);
+            this.updateStatus('Erreur: ' + data.message, 'error');
         });
 
         this.socket.on('disconnect', () => {
-            this.updateStatus('Déconnecté du serveur');
+            this.updateStatus('Déconnecté du serveur', 'error');
+            this.updateConnectionStatus('Déconnecté');
         });
     }
 
@@ -462,21 +625,28 @@ class GameClient {
     }
 
     drawBackground() {
-        // Gradient background
-        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        gradient.addColorStop(0, '#0f3460');
-        gradient.addColorStop(0.5, '#16213e');
-        gradient.addColorStop(1, '#0f3460');
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const backgroundImage = this.assetLoader.getAsset('backgroundImage');
 
-        // Animated stars
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        for (let i = 0; i < 50; i++) {
-            const x = (i * 73 + this.animationTime * 0.1) % this.canvas.width;
-            const y = (i * 127) % this.canvas.height;
-            const size = (Math.sin(this.animationTime * 0.05 + i) + 1) * 0.5 + 0.5;
-            this.ctx.fillRect(x, y, size, size);
+        if (backgroundImage) {
+            // Draw custom background image
+            this.ctx.drawImage(backgroundImage, 0, 0, this.canvas.width, this.canvas.height);
+        } else {
+            // Fallback to gradient background
+            const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            gradient.addColorStop(0, '#0f3460');
+            gradient.addColorStop(0.5, '#16213e');
+            gradient.addColorStop(1, '#0f3460');
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Animated stars
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 73 + this.animationTime * 0.1) % this.canvas.width;
+                const y = (i * 127) % this.canvas.height;
+                const size = (Math.sin(this.animationTime * 0.05 + i) + 1) * 0.5 + 0.5;
+                this.ctx.fillRect(x, y, size, size);
+            }
         }
     }
 
@@ -497,68 +667,80 @@ class GameClient {
         level.platforms.forEach(platform => {
             this.ctx.save();
 
-            switch (platform.type) {
-                case 'fire':
-                    // Animated fire platform
-                    const fireGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    const fireFlicker = Math.sin(this.animationTime * 0.1) * 0.2 + 0.8;
-                    fireGradient.addColorStop(0, `rgba(255, 107, 107, ${fireFlicker})`);
-                    fireGradient.addColorStop(1, '#E74C3C');
-                    this.ctx.fillStyle = fireGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            // Get texture based on platform type
+            const platformType = platform.type || 'neutral';
+            const texture = this.assetLoader.getTexture(platformType);
 
-                    // Fire particles on top
-                    if (Math.random() < 0.3) {
-                        this.particles.push(new Particle(
-                            platform.x + Math.random() * platform.width,
-                            platform.y,
-                            (Math.random() - 0.5) * 0.5,
-                            -Math.random() * 2 - 1,
-                            '#FF6B6B',
-                            20
-                        ));
-                    }
-                    break;
+            if (texture) {
+                // Draw with custom texture using pattern
+                const pattern = this.ctx.createPattern(texture, 'repeat');
+                this.ctx.fillStyle = pattern;
+                this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            } else {
+                // Fallback to gradient rendering
+                switch (platform.type) {
+                    case 'fire':
+                        // Animated fire platform
+                        const fireGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        const fireFlicker = Math.sin(this.animationTime * 0.1) * 0.2 + 0.8;
+                        fireGradient.addColorStop(0, `rgba(255, 107, 107, ${fireFlicker})`);
+                        fireGradient.addColorStop(1, '#E74C3C');
+                        this.ctx.fillStyle = fireGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                        break;
 
-                case 'water':
-                    // Animated water platform
-                    const waterGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    waterGradient.addColorStop(0, '#4ECDC4');
-                    waterGradient.addColorStop(1, '#3AAFA9');
-                    this.ctx.fillStyle = waterGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    case 'water':
+                        // Animated water platform
+                        const waterGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        waterGradient.addColorStop(0, '#4ECDC4');
+                        waterGradient.addColorStop(1, '#3AAFA9');
+                        this.ctx.fillStyle = waterGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
 
-                    // Water wave effect
-                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.beginPath();
-                    for (let x = 0; x < platform.width; x += 5) {
-                        const y = Math.sin((x + this.animationTime) * 0.1) * 2;
-                        if (x === 0) {
-                            this.ctx.moveTo(platform.x + x, platform.y + 5 + y);
-                        } else {
-                            this.ctx.lineTo(platform.x + x, platform.y + 5 + y);
+                        // Water wave effect
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        for (let x = 0; x < platform.width; x += 5) {
+                            const y = Math.sin((x + this.animationTime) * 0.1) * 2;
+                            if (x === 0) {
+                                this.ctx.moveTo(platform.x + x, platform.y + 5 + y);
+                            } else {
+                                this.ctx.lineTo(platform.x + x, platform.y + 5 + y);
+                            }
                         }
-                    }
-                    this.ctx.stroke();
-                    break;
+                        this.ctx.stroke();
+                        break;
 
-                default:
-                    // Regular platform with texture
-                    const neutralGradient = this.ctx.createLinearGradient(
-                        platform.x, platform.y,
-                        platform.x, platform.y + platform.height
-                    );
-                    neutralGradient.addColorStop(0, '#95A5A6');
-                    neutralGradient.addColorStop(1, '#7F8C8D');
-                    this.ctx.fillStyle = neutralGradient;
-                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    default:
+                        // Regular platform with texture
+                        const neutralGradient = this.ctx.createLinearGradient(
+                            platform.x, platform.y,
+                            platform.x, platform.y + platform.height
+                        );
+                        neutralGradient.addColorStop(0, '#95A5A6');
+                        neutralGradient.addColorStop(1, '#7F8C8D');
+                        this.ctx.fillStyle = neutralGradient;
+                        this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                }
+            }
+
+            // Fire particles on top for fire platforms
+            if (platform.type === 'fire' && Math.random() < 0.3) {
+                this.particles.push(new Particle(
+                    platform.x + Math.random() * platform.width,
+                    platform.y,
+                    (Math.random() - 0.5) * 0.5,
+                    -Math.random() * 2 - 1,
+                    '#FF6B6B',
+                    20
+                ));
             }
 
             // Enhanced border
@@ -651,39 +833,55 @@ class GameClient {
                 });
             }
 
-            // Draw player with gradient
-            const gradient = this.ctx.createLinearGradient(
-                player.position.x, player.position.y,
-                player.position.x, player.position.y + player.height
-            );
-            gradient.addColorStop(0, player.color);
-            gradient.addColorStop(1, this.darkenColor(player.color, 0.3));
-            this.ctx.fillStyle = gradient;
+            // Get player sprite
+            const playerSprite = index === 0
+                ? this.assetLoader.getAsset('player1Sprite')
+                : this.assetLoader.getAsset('player2Sprite');
 
-            // Round corners
-            this.roundRect(
-                player.position.x,
-                player.position.y,
-                player.width,
-                player.height,
-                5
-            );
-            this.ctx.fill();
+            if (playerSprite) {
+                // Draw custom sprite
+                this.ctx.drawImage(
+                    playerSprite,
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height
+                );
+            } else {
+                // Fallback to gradient rendering
+                const gradient = this.ctx.createLinearGradient(
+                    player.position.x, player.position.y,
+                    player.position.x, player.position.y + player.height
+                );
+                gradient.addColorStop(0, player.color);
+                gradient.addColorStop(1, this.darkenColor(player.color, 0.3));
+                this.ctx.fillStyle = gradient;
 
-            // Border with glow
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 2;
-            this.ctx.shadowBlur = 5;
-            this.ctx.shadowColor = 'white';
-            this.roundRect(
-                player.position.x,
-                player.position.y,
-                player.width,
-                player.height,
-                5
-            );
-            this.ctx.stroke();
-            this.ctx.shadowBlur = 0;
+                // Round corners
+                this.roundRect(
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height,
+                    5
+                );
+                this.ctx.fill();
+
+                // Border with glow
+                this.ctx.strokeStyle = 'white';
+                this.ctx.lineWidth = 2;
+                this.ctx.shadowBlur = 5;
+                this.ctx.shadowColor = 'white';
+                this.roundRect(
+                    player.position.x,
+                    player.position.y,
+                    player.width,
+                    player.height,
+                    5
+                );
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+            }
 
             // Direction indicator with animation
             this.ctx.fillStyle = 'white';
@@ -909,10 +1107,16 @@ class GameClient {
         return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
     }
 
-    updateStatus(message) {
+    updateStatus(message, type = 'info') {
         const statusElement = document.getElementById('status');
         if (statusElement) {
             statusElement.textContent = message;
+
+            // Remove all status classes
+            statusElement.classList.remove('success', 'error', 'warning', 'info');
+
+            // Add new status class
+            statusElement.classList.add(type);
         }
     }
 
@@ -922,7 +1126,7 @@ class GameClient {
 
         if (!scores || scores.length === 0) {
             scoreList.innerHTML = `
-                <div style="text-align: center; color: #aaa; padding: 20px;">
+                <div class="score-empty">
                     Aucun score pour le moment
                 </div>
             `;
@@ -935,12 +1139,12 @@ class GameClient {
         scoreList.innerHTML = sortedScores.map((score, index) => {
             const playerClass = index === 0 ? 'player1' : 'player2';
             const isCurrentPlayer = score.playerId === this.playerId;
-            const highlight = isCurrentPlayer ? 'style="background: rgba(255, 215, 0, 0.2);"' : '';
+            const highlight = isCurrentPlayer ? 'style="background: rgba(255, 215, 0, 0.1); border-color: var(--warning-color);"' : '';
 
             return `
                 <div class="score-entry ${playerClass}" ${highlight}>
                     <div class="score-name">
-                        ${score.playerName} ${isCurrentPlayer ? '(Vous)' : ''}
+                        ${score.playerName} ${isCurrentPlayer ? '👤' : ''}
                     </div>
                     <div class="score-stats">
                         <span class="score-wins">V: ${score.wins}</span>
