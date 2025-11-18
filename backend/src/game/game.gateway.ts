@@ -94,6 +94,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return {
       ...gameState,
       players: Array.from(gameState.players.values()),
+      scores: Array.from(gameState.scores.values()),
     };
   }
 }

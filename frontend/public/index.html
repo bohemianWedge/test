@@ -168,6 +168,80 @@
         .fire { background: #FF6B6B; }
         .water { background: #4ECDC4; }
         .neutral { background: #95A5A6; }
+
+        #scoreBoard {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.05));
+            border-radius: 10px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        #scoreBoard h3 {
+            margin-bottom: 15px;
+            color: #FFD700;
+            text-align: center;
+            font-size: 1.3em;
+        }
+
+        .score-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 8px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+
+        .score-entry:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: translateX(5px);
+        }
+
+        .score-entry.player1 {
+            border-left-color: #FF4444;
+        }
+
+        .score-entry.player2 {
+            border-left-color: #4444FF;
+        }
+
+        .score-name {
+            font-weight: bold;
+        }
+
+        .score-stats {
+            color: #aaa;
+        }
+
+        .score-wins {
+            color: #2ECC71;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .score-losses {
+            color: #E74C3C;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        #restartButton {
+            display: none;
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #2ECC71, #27AE60);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        #restartButton:hover {
+            background: linear-gradient(135deg, #27AE60, #229954);
+        }
     </style>
 </head>
 <body>
@@ -193,6 +267,17 @@
             <span class="platform-type water">💧 Eau</span> - Ralentissement
             <span class="platform-type neutral">▪️ Neutre</span> - Aucun effet
         </div>
+
+        <div id="scoreBoard">
+            <h3>🏆 Tableau des Scores 🏆</h3>
+            <div id="scoreList">
+                <div style="text-align: center; color: #aaa; padding: 20px;">
+                    Aucun score pour le moment
+                </div>
+            </div>
+        </div>
+
+        <button id="restartButton">🔄 Rejouer</button>
 
         <div id="status">En attente de connexion...</div>
     </div>

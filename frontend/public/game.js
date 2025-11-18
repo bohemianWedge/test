@@ -76,7 +76,18 @@ class GameClient {
     init() {
         this.connectToServer();
         this.setupControls();
+        this.setupRestartButton();
         this.startRenderLoop();
+    }
+
+    setupRestartButton() {
+        const restartButton = document.getElementById('restartButton');
+        restartButton.addEventListener('click', () => {
+            if (this.socket && this.socket.connected) {
+                this.socket.emit('resetGame');
+                restartButton.style.display = 'none';
+            }
+        });
     }
 
     connectToServer() {
@@ -105,12 +116,24 @@ class GameClient {
                 this.playerIndex = state.players.findIndex(p => p.id === this.playerId);
             }
 
+            // Update scores display
+            if (state.scores) {
+                this.updateScoreBoard(state.scores);
+            }
+
             if (state.gameStarted && !state.winner) {
                 this.updateStatus('Partie en cours...');
+                document.getElementById('restartButton').style.display = 'none';
             } else if (state.winner) {
                 const isWinner = state.winner === this.playerId;
                 this.updateStatus(isWinner ? 'Vous avez gagné!' : 'Vous avez perdu');
+                document.getElementById('restartButton').style.display = 'block';
             }
+        });
+
+        this.socket.on('gameReset', () => {
+            this.updateStatus('Nouvelle partie!');
+            document.getElementById('restartButton').style.display = 'none';
         });
 
         this.socket.on('playerConnected', () => {
@@ -794,6 +817,41 @@ class GameClient {
         if (statusElement) {
             statusElement.textContent = message;
         }
+    }
+
+    updateScoreBoard(scores) {
+        const scoreList = document.getElementById('scoreList');
+        if (!scoreList) return;
+
+        if (!scores || scores.length === 0) {
+            scoreList.innerHTML = `
+                <div style="text-align: center; color: #aaa; padding: 20px;">
+                    Aucun score pour le moment
+                </div>
+            `;
+            return;
+        }
+
+        // Sort by wins descending
+        const sortedScores = [...scores].sort((a, b) => b.wins - a.wins);
+
+        scoreList.innerHTML = sortedScores.map((score, index) => {
+            const playerClass = index === 0 ? 'player1' : 'player2';
+            const isCurrentPlayer = score.playerId === this.playerId;
+            const highlight = isCurrentPlayer ? 'style="background: rgba(255, 215, 0, 0.2);"' : '';
+
+            return `
+                <div class="score-entry ${playerClass}" ${highlight}>
+                    <div class="score-name">
+                        ${score.playerName} ${isCurrentPlayer ? '(Vous)' : ''}
+                    </div>
+                    <div class="score-stats">
+                        <span class="score-wins">V: ${score.wins}</span>
+                        <span class="score-losses">D: ${score.losses}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 }
 
