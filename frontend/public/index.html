@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Puzzle Game - ft_transcendence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #gameContainer {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        canvas {
+            border: 3px solid #16213e;
+            border-radius: 5px;
+            background: #0f3460;
+            display: block;
+        }
+
+        #controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .info {
+            margin: 5px 0;
+        }
+
+        .player1-color {
+            color: #FF4444;
+        }
+
+        .player2-color {
+            color: #4444FF;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #667eea;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 2D Puzzle Battle Game</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <div id="controls">
+            <div class="info">
+                <span class="player1-color">▮ Joueur 1:</span> WASD (déplacement) + E (tir)
+            </div>
+            <div class="info">
+                <span class="player2-color">▮ Joueur 2:</span> Flèches (déplacement) + Entrée (tir)
+            </div>
+            <div class="info">Combinaisons: W+E (tir haut), S+E (tir bas)</div>
+            <div class="info">But: Atteindre votre objectif avant l'adversaire!</div>
+        </div>
+
+        <div id="status">En attente de connexion...</div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

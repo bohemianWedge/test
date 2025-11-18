@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: transcendence_db
+    environment:
+      POSTGRES_DB: transcendence
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - transcendence_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: transcendence_backend
+    environment:
+      DATABASE_URL: postgresql://admin:admin123@postgres:5432/transcendence
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - transcendence_network
+    command: npm run start:dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: transcendence_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - transcendence_network
+
+volumes:
+  postgres_data:
+
+networks:
+  transcendence_network:
+    driver: bridge
