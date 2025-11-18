@@ -37,34 +37,76 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleConnection(@ConnectedSocket() client: Socket) {
     console.log(`Client connected: ${client.id}`);
 
-    const player = this.gameService.addPlayer(client.id);
+    // Check if client is in local mode
+    const gameMode = client.handshake.query.gameMode;
+    const isLocalMode = gameMode === 'local';
 
-    if (player) {
-      client.emit('playerJoined', {
-        playerId: client.id,
-        player,
-      });
+    if (isLocalMode) {
+      // In local mode, create both players for this single client
+      const player1 = this.gameService.addPlayer(client.id + '-p1');
+      const player2 = this.gameService.addPlayer(client.id + '-p2');
 
-      // Send current game state
-      const gameState = this.gameService.getGameState();
+      if (player1 && player2) {
+        // Store local mode flag on the socket
+        (client as any).isLocalMode = true;
+        (client as any).localPlayerId1 = client.id + '-p1';
+        (client as any).localPlayerId2 = client.id + '-p2';
 
-      // Broadcast to all clients to ensure everyone sees the new player immediately
-      this.broadcastGameState(gameState);
+        client.emit('playerJoined', {
+          playerId: client.id,
+          player: player1,
+          isLocalMode: true,
+        });
 
-      // Notify other players
-      client.broadcast.emit('playerConnected', {
-        playerId: client.id,
-        player,
-      });
+        // Broadcast to all clients
+        const gameState = this.gameService.getGameState();
+        this.broadcastGameState(gameState);
+
+        console.log(`Local mode activated for ${client.id}`);
+      } else {
+        client.emit('error', { message: 'Cannot create local game' });
+        client.disconnect();
+      }
     } else {
-      client.emit('error', { message: 'Game is full' });
-      client.disconnect();
+      // Online mode - normal behavior
+      const player = this.gameService.addPlayer(client.id);
+
+      if (player) {
+        client.emit('playerJoined', {
+          playerId: client.id,
+          player,
+        });
+
+        // Send current game state
+        const gameState = this.gameService.getGameState();
+
+        // Broadcast to all clients to ensure everyone sees the new player immediately
+        this.broadcastGameState(gameState);
+
+        // Notify other players
+        client.broadcast.emit('playerConnected', {
+          playerId: client.id,
+          player,
+        });
+      } else {
+        client.emit('error', { message: 'Game is full' });
+        client.disconnect();
+      }
     }
   }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
-    this.gameService.removePlayer(client.id);
+
+    // Check if this was a local mode client
+    if ((client as any).isLocalMode) {
+      // Remove both players
+      this.gameService.removePlayer((client as any).localPlayerId1);
+      this.gameService.removePlayer((client as any).localPlayerId2);
+    } else {
+      // Remove single player
+      this.gameService.removePlayer(client.id);
+    }
 
     this.server.emit('playerDisconnected', {
       playerId: client.id,
@@ -77,6 +119,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() input: InputState,
   ) {
     this.gameService.handleInput(client.id, input);
+  }
+
+  @SubscribeMessage('localInput')
+  handleLocalInput(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() inputs: { player1: InputState; player2: InputState },
+  ) {
+    if ((client as any).isLocalMode) {
+      // Handle both players' inputs
+      this.gameService.handleInput((client as any).localPlayerId1, inputs.player1);
+      this.gameService.handleInput((client as any).localPlayerId2, inputs.player2);
+    }
   }
 
   @SubscribeMessage('resetGame')

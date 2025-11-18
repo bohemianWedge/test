@@ -58,6 +58,9 @@ class GameClient {
         this.playerIndex = null;
         this.gameState = null;
         this.previousGameState = null;
+        this.gameMode = null; // 'local' or 'online'
+
+        // Input state for player 1 (or single player in online mode)
         this.inputState = {
             up: false,
             down: false,
@@ -65,7 +68,18 @@ class GameClient {
             right: false,
             shoot: false,
         };
+
+        // Input state for player 2 (only used in local mode)
+        this.inputStateP2 = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            shoot: false,
+        };
+
         this.lastShootState = false;
+        this.lastShootStateP2 = false;
         this.particles = [];
         this.animationTime = 0;
         this.cameraShake = { x: 0, y: 0, intensity: 0 };
@@ -74,10 +88,38 @@ class GameClient {
     }
 
     init() {
-        this.connectToServer();
-        this.setupControls();
+        this.setupModeSelection();
         this.setupRestartButton();
         this.startRenderLoop();
+    }
+
+    setupModeSelection() {
+        const modeSelection = document.getElementById('modeSelection');
+        const localModeBtn = document.getElementById('localModeBtn');
+        const onlineModeBtn = document.getElementById('onlineModeBtn');
+
+        localModeBtn.addEventListener('click', () => {
+            this.gameMode = 'local';
+            modeSelection.classList.add('hidden');
+            this.startLocalMode();
+        });
+
+        onlineModeBtn.addEventListener('click', () => {
+            this.gameMode = 'online';
+            modeSelection.classList.add('hidden');
+            this.startOnlineMode();
+        });
+    }
+
+    startLocalMode() {
+        this.connectToServer();
+        this.setupControls();
+        this.updateStatus('Mode local - Les deux joueurs peuvent jouer!');
+    }
+
+    startOnlineMode() {
+        this.connectToServer();
+        this.setupControls();
     }
 
     setupRestartButton() {
@@ -95,11 +137,19 @@ class GameClient {
             ? 'http://localhost:3000'
             : `http://${window.location.hostname}:3000`;
 
-        this.socket = io(backendUrl);
+        this.socket = io(backendUrl, {
+            query: {
+                gameMode: this.gameMode
+            }
+        });
 
         this.socket.on('connect', () => {
             console.log('Connected to server');
-            this.updateStatus('Connecté au serveur');
+            if (this.gameMode === 'local') {
+                this.updateStatus('Mode local activé - Les deux joueurs peuvent jouer!');
+            } else {
+                this.updateStatus('Connecté au serveur');
+            }
         });
 
         this.socket.on('playerJoined', (data) => {
@@ -164,12 +214,13 @@ class GameClient {
     }
 
     handleKeyEvent(e, isPressed) {
-        if (this.playerIndex === null) return;
+        // In online mode, wait for playerIndex to be assigned
+        if (this.gameMode === 'online' && this.playerIndex === null) return;
 
         let keyHandled = false;
 
-        // Player 1 controls (WASD + E)
-        if (this.playerIndex === 0) {
+        // Player 1 controls (WASD + E) - Always active in local mode, or for player 1 in online mode
+        if (this.gameMode === 'local' || this.playerIndex === 0) {
             switch (e.key.toLowerCase()) {
                 case 'w':
                     this.inputState.up = isPressed;
@@ -190,40 +241,63 @@ class GameClient {
                 case 'e':
                     this.inputState.shoot = isPressed;
                     if (isPressed && !this.lastShootState) {
-                        this.createShootEffect();
+                        this.createShootEffect(0);
                     }
                     keyHandled = true;
                     break;
             }
         }
 
-        // Player 2 controls (Arrow keys + Enter)
-        if (this.playerIndex === 1) {
+        // Player 2 controls (Arrow keys + Enter) - Always active in local mode, or for player 2 in online mode
+        if (this.gameMode === 'local' || this.playerIndex === 1) {
             switch (e.key) {
                 case 'ArrowUp':
-                    this.inputState.up = isPressed;
+                    if (this.gameMode === 'local') {
+                        this.inputStateP2.up = isPressed;
+                    } else {
+                        this.inputState.up = isPressed;
+                    }
                     keyHandled = true;
                     e.preventDefault();
                     break;
                 case 'ArrowDown':
-                    this.inputState.down = isPressed;
+                    if (this.gameMode === 'local') {
+                        this.inputStateP2.down = isPressed;
+                    } else {
+                        this.inputState.down = isPressed;
+                    }
                     keyHandled = true;
                     e.preventDefault();
                     break;
                 case 'ArrowLeft':
-                    this.inputState.left = isPressed;
+                    if (this.gameMode === 'local') {
+                        this.inputStateP2.left = isPressed;
+                    } else {
+                        this.inputState.left = isPressed;
+                    }
                     keyHandled = true;
                     e.preventDefault();
                     break;
                 case 'ArrowRight':
-                    this.inputState.right = isPressed;
+                    if (this.gameMode === 'local') {
+                        this.inputStateP2.right = isPressed;
+                    } else {
+                        this.inputState.right = isPressed;
+                    }
                     keyHandled = true;
                     e.preventDefault();
                     break;
                 case 'Enter':
-                    this.inputState.shoot = isPressed;
-                    if (isPressed && !this.lastShootState) {
-                        this.createShootEffect();
+                    if (this.gameMode === 'local') {
+                        this.inputStateP2.shoot = isPressed;
+                        if (isPressed && !this.lastShootStateP2) {
+                            this.createShootEffect(1);
+                        }
+                    } else {
+                        this.inputState.shoot = isPressed;
+                        if (isPressed && !this.lastShootState) {
+                            this.createShootEffect(1);
+                        }
                     }
                     keyHandled = true;
                     e.preventDefault();
@@ -235,18 +309,32 @@ class GameClient {
             // Always send input when any key state changes
             this.sendInput();
             this.lastShootState = this.inputState.shoot;
+            this.lastShootStateP2 = this.inputStateP2.shoot;
         }
     }
 
     sendInput() {
         if (this.socket && this.socket.connected) {
-            this.socket.emit('input', this.inputState);
+            if (this.gameMode === 'local') {
+                // Send both players' inputs in local mode
+                this.socket.emit('localInput', {
+                    player1: this.inputState,
+                    player2: this.inputStateP2
+                });
+            } else {
+                // Send only this player's input in online mode
+                this.socket.emit('input', this.inputState);
+            }
         }
     }
 
-    createShootEffect() {
+    createShootEffect(playerIndex) {
         if (!this.gameState || !this.gameState.players) return;
-        const player = this.gameState.players[this.playerIndex];
+
+        // In local mode, use the provided playerIndex
+        // In online mode, use this.playerIndex
+        const targetPlayerIndex = this.gameMode === 'local' ? playerIndex : this.playerIndex;
+        const player = this.gameState.players[targetPlayerIndex];
         if (!player) return;
 
         const centerX = player.position.x + player.width / 2;
