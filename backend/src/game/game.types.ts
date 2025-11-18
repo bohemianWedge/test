@@ -14,6 +14,16 @@ export interface Player {
   height: number;
   hasFinished: boolean;
   color: string;
+  currentPlatformType?: 'solid' | 'water' | 'fire' | 'neutral' | 'ice';
+  lastDamageTime?: number;
+  isInvincible?: boolean;
+  effects?: PlayerEffect[];
+}
+
+export interface PlayerEffect {
+  type: 'burning' | 'slowed' | 'frozen' | 'invincible';
+  duration: number;
+  startTime: number;
 }
 
 export interface Projectile {

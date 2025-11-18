@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/core';
+import { Module } from '@nestjs/common';
 import { GameModule } from './game/game.module';
 
 @Module({
