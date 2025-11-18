@@ -97,16 +97,22 @@ class GameClient {
         const modeSelection = document.getElementById('modeSelection');
         const localModeBtn = document.getElementById('localModeBtn');
         const onlineModeBtn = document.getElementById('onlineModeBtn');
+        const gameContainer = document.getElementById('gameContainer');
+        const title = document.querySelector('h1');
 
         localModeBtn.addEventListener('click', () => {
             this.gameMode = 'local';
             modeSelection.classList.add('hidden');
+            gameContainer.classList.add('active');
+            title.classList.add('active');
             this.startLocalMode();
         });
 
         onlineModeBtn.addEventListener('click', () => {
             this.gameMode = 'online';
             modeSelection.classList.add('hidden');
+            gameContainer.classList.add('active');
+            title.classList.add('active');
             this.startOnlineMode();
         });
     }

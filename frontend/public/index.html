@@ -50,6 +50,11 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
             animation: fadeIn 1s ease-out, pulse 3s ease-in-out infinite;
             font-size: 2.5em;
+            display: none; /* Hidden until mode is selected */
+        }
+
+        h1.active {
+            display: block;
         }
 
         #gameContainer {
@@ -303,6 +308,14 @@
 
         .hidden {
             display: none !important;
+        }
+
+        #gameContainer {
+            display: none; /* Hidden until mode is selected */
+        }
+
+        #gameContainer.active {
+            display: block;
         }
     </style>
 </head>
