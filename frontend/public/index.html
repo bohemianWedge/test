@@ -346,10 +346,10 @@
 
         <div id="controls">
             <div class="info">
-                <span class="player1-color">▮ Joueur 1:</span> WASD (déplacement) + E (tir)
+                <span class="player1-color">🔥 Joueur 1 (Feu):</span> WASD (déplacement) + E (tir)
             </div>
             <div class="info">
-                <span class="player2-color">▮ Joueur 2:</span> Flèches (déplacement) + Entrée (tir)
+                <span class="player2-color">💧 Joueur 2 (Eau):</span> Flèches (déplacement) + Entrée (tir)
             </div>
             <div class="info">Combinaisons: W+E (tir haut), S+E (tir bas), etc.</div>
             <div class="info">But: Atteindre votre objectif avant l'adversaire!</div>
@@ -357,13 +357,17 @@
                 Mode Local: Les deux joueurs jouent sur le même ordinateur<br>
                 Mode En Ligne: Chaque joueur sur son propre appareil
             </div>
+            <div class="info" style="margin-top: 10px; color: #FFD700; font-weight: bold;">
+                ⚠️ Attention: Évitez les plateformes de l'élément adverse!<br>
+                🔥 Feu meurt sur 💧 Eau | 💧 Eau meurt sur 🔥 Feu
+            </div>
         </div>
 
         <div class="legend">
             <div class="legend-title">Types de plateformes:</div>
-            <span class="platform-type fire">🔥 Feu</span> - Effet de brûlure
-            <span class="platform-type water">💧 Eau</span> - Ralentissement
-            <span class="platform-type neutral">▪️ Neutre</span> - Aucun effet
+            <span class="platform-type fire">🔥 Feu</span> - Tue joueur Eau
+            <span class="platform-type water">💧 Eau</span> - Tue joueur Feu
+            <span class="platform-type neutral">▪️ Neutre</span> - Sûr pour tous
         </div>
 
         <div id="scoreBoard">

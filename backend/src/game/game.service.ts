@@ -52,6 +52,7 @@ export class GameService {
       height: GAME_CONFIG.PLAYER_HEIGHT,
       hasFinished: false,
       color: GAME_CONFIG.PLAYER_COLORS[playerCount],
+      element: playerCount === 0 ? 'fire' : 'water', // Player 1 = fire, Player 2 = water
       currentPlatformType: 'neutral',
       lastDamageTime: 0,
       isInvincible: false,
@@ -272,13 +273,22 @@ export class GameService {
     const currentTime = Date.now();
 
     this.gameState.players.forEach((player) => {
-      if (!player.isGrounded) return;
+      if (!player.isGrounded || player.isInvincible) return;
 
-      switch (player.currentPlatformType) {
+      const platformType = player.currentPlatformType;
+
+      // Check if player is on incompatible platform
+      if (this.isIncompatiblePlatform(player.element, platformType)) {
+        // Player dies on incompatible platform
+        this.respawnPlayer(player);
+        return;
+      }
+
+      // Apply platform effects (only if player survives)
+      switch (platformType) {
         case 'fire':
           // Apply fire damage with cooldown
           if (
-            !player.isInvincible &&
             currentTime - player.lastDamageTime > GAME_CONFIG.FIRE_DAMAGE_COOLDOWN
           ) {
             player.lastDamageTime = currentTime;
@@ -297,6 +307,28 @@ export class GameService {
           break;
       }
     });
+  }
+
+  private isIncompatiblePlatform(
+    playerElement: 'fire' | 'water',
+    platformType: string,
+  ): boolean {
+    // Neutral, solid, and ice platforms are safe for everyone
+    if (platformType === 'neutral' || platformType === 'solid' || platformType === 'ice') {
+      return false;
+    }
+
+    // Fire player dies on water platforms
+    if (playerElement === 'fire' && platformType === 'water') {
+      return true;
+    }
+
+    // Water player dies on fire platforms
+    if (playerElement === 'water' && platformType === 'fire') {
+      return true;
+    }
+
+    return false;
   }
 
   private addPlayerEffect(

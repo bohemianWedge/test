@@ -706,13 +706,16 @@ class GameClient {
             }
             this.ctx.fill();
 
-            // Player label with background
+            // Player label with background and element indicator
+            const elementEmoji = player.element === 'fire' ? '🔥' : '💧';
+            const labelText = `${elementEmoji} P${index + 1}`;
+
             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            this.ctx.fillRect(centerX - 15, player.position.y - 20, 30, 15);
+            this.ctx.fillRect(centerX - 25, player.position.y - 20, 50, 15);
             this.ctx.fillStyle = 'white';
             this.ctx.font = 'bold 12px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(`P${index + 1}`, centerX, player.position.y - 8);
+            this.ctx.fillText(labelText, centerX, player.position.y - 8);
 
             this.ctx.restore();
 
