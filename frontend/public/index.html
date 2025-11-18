@@ -3,383 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Puzzle Game - ft_transcendence</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); }
-            50% { box-shadow: 0 10px 60px rgba(102, 126, 234, 0.6); }
-        }
-
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            background-size: 200% 200%;
-            animation: gradient 15s ease infinite;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-        }
-
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        h1 {
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 1s ease-out, pulse 3s ease-in-out infinite;
-            font-size: 2.5em;
-            display: none; /* Hidden until mode is selected */
-        }
-
-        h1.active {
-            display: block;
-        }
-
-        #gameContainer {
-            background: #1a1a2e;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            animation: fadeIn 1.2s ease-out, glow 3s ease-in-out infinite;
-        }
-
-        canvas {
-            border: 4px solid #16213e;
-            border-radius: 8px;
-            background: #0f3460;
-            display: block;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-        }
-
-        #controls {
-            margin-top: 20px;
-            padding: 20px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-            border-radius: 10px;
-            font-size: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-        }
-
-        #status {
-            margin-top: 15px;
-            padding: 12px;
-            background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2));
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        #status:hover {
-            transform: scale(1.02);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .info {
-            margin: 8px 0;
-            padding: 5px;
-            transition: all 0.2s ease;
-        }
-
-        .info:hover {
-            transform: translateX(5px);
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 5px;
-        }
-
-        .player1-color {
-            color: #FF4444;
-            font-weight: bold;
-            text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
-        }
-
-        .player2-color {
-            color: #4444FF;
-            font-weight: bold;
-            text-shadow: 0 0 10px rgba(68, 68, 255, 0.5);
-        }
-
-        button {
-            margin-top: 10px;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .legend {
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            font-size: 13px;
-            border-left: 4px solid #667eea;
-        }
-
-        .legend-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #FFD700;
-        }
-
-        .platform-type {
-            display: inline-block;
-            padding: 3px 8px;
-            margin: 2px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        .fire { background: #FF6B6B; }
-        .water { background: #4ECDC4; }
-        .neutral { background: #95A5A6; }
-
-        #scoreBoard {
-            margin-top: 20px;
-            padding: 20px;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.05));
-            border-radius: 10px;
-            border: 2px solid rgba(255, 215, 0, 0.3);
-            backdrop-filter: blur(10px);
-        }
-
-        #scoreBoard h3 {
-            margin-bottom: 15px;
-            color: #FFD700;
-            text-align: center;
-            font-size: 1.3em;
-        }
-
-        .score-entry {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            margin: 8px 0;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            border-left: 4px solid;
-            transition: all 0.3s ease;
-        }
-
-        .score-entry:hover {
-            background: rgba(0, 0, 0, 0.5);
-            transform: translateX(5px);
-        }
-
-        .score-entry.player1 {
-            border-left-color: #FF4444;
-        }
-
-        .score-entry.player2 {
-            border-left-color: #4444FF;
-        }
-
-        .score-name {
-            font-weight: bold;
-        }
-
-        .score-stats {
-            color: #aaa;
-        }
-
-        .score-wins {
-            color: #2ECC71;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        .score-losses {
-            color: #E74C3C;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        #restartButton {
-            display: none;
-            width: 100%;
-            margin-top: 15px;
-            padding: 15px;
-            font-size: 18px;
-            background: linear-gradient(135deg, #2ECC71, #27AE60);
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        #restartButton:hover {
-            background: linear-gradient(135deg, #27AE60, #229954);
-        }
-
-        #modeSelection {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-        }
-
-        #modeSelection h2 {
-            font-size: 2.5em;
-            margin-bottom: 40px;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        .mode-buttons {
-            display: flex;
-            gap: 30px;
-            margin-top: 20px;
-        }
-
-        .mode-button {
-            padding: 30px 50px;
-            font-size: 1.5em;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 15px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            min-width: 250px;
-        }
-
-        .mode-button:hover {
-            transform: translateY(-5px) scale(1.05);
-            box-shadow: 0 15px 40px rgba(118, 75, 162, 0.6);
-            border-color: rgba(255, 255, 255, 0.6);
-        }
-
-        .mode-button:active {
-            transform: translateY(-2px) scale(1.02);
-        }
-
-        .mode-description {
-            font-size: 0.6em;
-            margin-top: 10px;
-            opacity: 0.8;
-            font-weight: normal;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        #gameContainer {
-            display: none; /* Hidden until mode is selected */
-        }
-
-        #gameContainer.active {
-            display: block;
-        }
-    </style>
+    <meta name="description" content="2D Puzzle Battle Game - Un jeu multijoueur en temps réel inspiré de Fireboy & Watergirl">
+    <title>Puzzle Battle Arena - ft_transcendence</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">Chargement des assets...</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loadingProgressBar" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span>🎮</span>
+                <span>Puzzle Battle Arena</span>
+            </div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#game">Jeu</a></li>
+                    <li><a href="#how-to-play">Comment jouer</a></li>
+                    <li><a href="#scores">Scores</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
     <!-- Mode Selection Screen -->
     <div id="modeSelection">
-        <h2>🎮 Choisissez votre mode de jeu 🎮</h2>
-        <div class="mode-buttons">
-            <button class="mode-button" id="localModeBtn">
-                🏠 Mode Local
-                <div class="mode-description">
-                    Deux joueurs sur le même ordinateur
-                </div>
-            </button>
-            <button class="mode-button" id="onlineModeBtn">
-                🌐 Mode En Ligne
-                <div class="mode-description">
-                    Jouer contre un autre joueur en ligne
-                </div>
-            </button>
+        <h1 class="mode-selection-title">Choisissez votre mode de jeu</h1>
+        <p class="page-subtitle">Sélectionnez comment vous souhaitez jouer</p>
+
+        <div class="mode-buttons-container">
+            <div class="mode-button" id="localModeBtn">
+                <span class="mode-button-icon">🏠</span>
+                <h3 class="mode-button-title">Mode Local</h3>
+                <p class="mode-button-description">
+                    Deux joueurs sur le même ordinateur. Parfait pour jouer côte à côte avec un ami.
+                </p>
+            </div>
+
+            <div class="mode-button" id="onlineModeBtn">
+                <span class="mode-button-icon">🌐</span>
+                <h3 class="mode-button-title">Mode En Ligne</h3>
+                <p class="mode-button-description">
+                    Affrontez un autre joueur en ligne. Chacun joue sur son propre appareil.
+                </p>
+            </div>
         </div>
     </div>
 
-    <h1>🎮 2D Puzzle Battle Game</h1>
+    <!-- Main Content -->
+    <main class="main-container">
+        <div id="gameContainer">
+            <!-- Game Main Section -->
+            <div class="game-main">
+                <!-- Canvas Container -->
+                <div class="canvas-container" id="game">
+                    <canvas id="gameCanvas" width="800" height="600"></canvas>
+                </div>
 
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+                <!-- Status Display -->
+                <div id="status" class="info">En attente de connexion...</div>
 
-        <div id="controls">
-            <div class="info">
-                <span class="player1-color">▮ Joueur 1:</span> WASD (déplacement) + E (tir)
-            </div>
-            <div class="info">
-                <span class="player2-color">▮ Joueur 2:</span> Flèches (déplacement) + Entrée (tir)
-            </div>
-            <div class="info">Combinaisons: W+E (tir haut), S+E (tir bas), etc.</div>
-            <div class="info">But: Atteindre votre objectif avant l'adversaire!</div>
-            <div class="info" style="margin-top: 10px; font-style: italic; opacity: 0.8;">
-                Mode Local: Les deux joueurs jouent sur le même ordinateur<br>
-                Mode En Ligne: Chaque joueur sur son propre appareil
-            </div>
-        </div>
+                <!-- Restart Button -->
+                <button id="restartButton" class="btn btn-success btn-full">
+                    <span>🔄</span>
+                    <span>Nouvelle Partie</span>
+                </button>
 
-        <div class="legend">
-            <div class="legend-title">Types de plateformes:</div>
-            <span class="platform-type fire">🔥 Feu</span> - Effet de brûlure
-            <span class="platform-type water">💧 Eau</span> - Ralentissement
-            <span class="platform-type neutral">▪️ Neutre</span> - Aucun effet
-        </div>
+                <!-- How to Play Section -->
+                <div class="card" id="how-to-play">
+                    <div class="card-header">
+                        <span class="card-icon">🎯</span>
+                        <h3 class="card-title">Objectif du jeu</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Soyez le premier à atteindre votre zone d'objectif (GOAL) ! Utilisez les boutons pour ouvrir les portes et tirez des projectiles pour renvoyer votre adversaire au départ.</p>
+                    </div>
+                </div>
 
-        <div id="scoreBoard">
-            <h3>🏆 Tableau des Scores 🏆</h3>
-            <div id="scoreList">
-                <div style="text-align: center; color: #aaa; padding: 20px;">
-                    Aucun score pour le moment
+                <!-- Controls Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">⌨️</span>
+                        <h3 class="card-title">Contrôles</h3>
+                    </div>
+                    <div class="card-body controls-grid">
+                        <div class="control-row">
+                            <span class="control-label player1-label">🔴 Joueur 1</span>
+                            <span class="control-keys">WASD (déplacement) + E (tir)</span>
+                        </div>
+                        <div class="control-row">
+                            <span class="control-label player2-label">🔵 Joueur 2</span>
+                            <span class="control-keys">Flèches (déplacement) + Entrée (tir)</span>
+                        </div>
+                        <div class="control-row">
+                            <span class="control-label">⚡ Combos</span>
+                            <span class="control-keys">W+E (tir haut), S+E (tir bas)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Sidebar -->
+            <aside class="game-sidebar">
+                <!-- Score Board -->
+                <div class="card" id="scores">
+                    <div class="card-header">
+                        <span class="card-icon">🏆</span>
+                        <h3 class="card-title">Tableau des Scores</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="score-list" id="scoreList">
+                            <div class="score-empty">
+                                Aucun score pour le moment
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Platform Legend -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">🎨</span>
+                        <h3 class="card-title">Types de Plateformes</h3>
+                    </div>
+                    <div class="card-body legend-items">
+                        <div class="legend-item">
+                            <div class="legend-icon fire"></div>
+                            <div>
+                                <strong>Feu</strong> - Effet de brûlure
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-icon water"></div>
+                            <div>
+                                <strong>Eau</strong> - Ralentissement
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-icon neutral"></div>
+                            <div>
+                                <strong>Neutre</strong> - Aucun effet
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">ℹ️</span>
+                        <h3 class="card-title">Informations</h3>
+                    </div>
+                    <div class="card-body">
+                        <p style="font-size: 0.9rem; line-height: 1.6;">
+                            <strong id="currentMode">Mode:</strong> En attente...<br>
+                            <strong>Connexion:</strong> <span id="connectionStatus">Déconnecté</span><br>
+                            <strong>Joueurs:</strong> <span id="playerCount">0/2</span>
+                        </p>
+                    </div>
+                </div>
+            </aside>
         </div>
+    </main>
 
-        <button id="restartButton">🔄 Rejouer</button>
-
-        <div id="status">En attente de connexion...</div>
-    </div>
-
+    <!-- Scripts -->
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="game.js"></script>
 </body>

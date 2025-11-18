@@ -37,6 +37,11 @@ class AssetLoader {
         console.log(`Assets loaded: ${this.assetsLoaded}/${this.assetsToLoad}`);
     }
 
+    getLoadingProgress() {
+        if (this.assetsToLoad === 0) return 0;
+        return Math.round((this.assetsLoaded / this.assetsToLoad) * 100);
+    }
+
     loadImage(key, path) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -162,11 +167,48 @@ class GameClient {
     }
 
     async init() {
-        // Load assets first
+        // Show loading screen and load assets
+        this.showLoadingScreen();
+
+        // Update loading progress
+        const progressInterval = setInterval(() => {
+            const progress = this.assetLoader.getLoadingProgress();
+            this.updateLoadingProgress(progress);
+        }, 100);
+
         await this.assetLoader.loadAllAssets();
-        this.setupModeSelection();
-        this.setupRestartButton();
-        this.startRenderLoop();
+
+        clearInterval(progressInterval);
+        this.updateLoadingProgress(100);
+
+        // Hide loading screen after a short delay
+        setTimeout(() => {
+            this.hideLoadingScreen();
+            this.setupModeSelection();
+            this.setupRestartButton();
+            this.startRenderLoop();
+        }, 500);
+    }
+
+    showLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('hidden');
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+        }
+    }
+
+    updateLoadingProgress(progress) {
+        const progressBar = document.getElementById('loadingProgressBar');
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
     }
 
     setupModeSelection() {
@@ -174,13 +216,12 @@ class GameClient {
         const localModeBtn = document.getElementById('localModeBtn');
         const onlineModeBtn = document.getElementById('onlineModeBtn');
         const gameContainer = document.getElementById('gameContainer');
-        const title = document.querySelector('h1');
 
         localModeBtn.addEventListener('click', () => {
             this.gameMode = 'local';
             modeSelection.classList.add('hidden');
             gameContainer.classList.add('active');
-            title.classList.add('active');
+            this.updateModeDisplay('Mode Local');
             this.startLocalMode();
         });
 
@@ -188,15 +229,38 @@ class GameClient {
             this.gameMode = 'online';
             modeSelection.classList.add('hidden');
             gameContainer.classList.add('active');
-            title.classList.add('active');
+            this.updateModeDisplay('Mode En Ligne');
             this.startOnlineMode();
         });
+    }
+
+    updateModeDisplay(mode) {
+        const currentMode = document.getElementById('currentMode');
+        if (currentMode) {
+            currentMode.textContent = `Mode: ${mode}`;
+        }
+    }
+
+    updateConnectionStatus(status) {
+        const connectionStatus = document.getElementById('connectionStatus');
+        if (connectionStatus) {
+            connectionStatus.textContent = status;
+            connectionStatus.style.color = status === 'Connecté' ? 'var(--success-color)' : 'var(--error-color)';
+        }
+    }
+
+    updatePlayerCount(count, total = 2) {
+        const playerCount = document.getElementById('playerCount');
+        if (playerCount) {
+            playerCount.textContent = `${count}/${total}`;
+        }
     }
 
     startLocalMode() {
         this.connectToServer();
         this.setupControls();
-        this.updateStatus('Mode local - Les deux joueurs peuvent jouer!');
+        this.updateStatus('Mode local - Les deux joueurs peuvent jouer!', 'info');
+        this.updatePlayerCount(2);
     }
 
     startOnlineMode() {
@@ -209,9 +273,23 @@ class GameClient {
         restartButton.addEventListener('click', () => {
             if (this.socket && this.socket.connected) {
                 this.socket.emit('resetGame');
-                restartButton.style.display = 'none';
+                this.hideRestartButton();
             }
         });
+    }
+
+    showRestartButton() {
+        const restartButton = document.getElementById('restartButton');
+        if (restartButton) {
+            restartButton.classList.add('active');
+        }
+    }
+
+    hideRestartButton() {
+        const restartButton = document.getElementById('restartButton');
+        if (restartButton) {
+            restartButton.classList.remove('active');
+        }
     }
 
     connectToServer() {
@@ -227,17 +305,19 @@ class GameClient {
 
         this.socket.on('connect', () => {
             console.log('Connected to server');
+            this.updateConnectionStatus('Connecté');
             if (this.gameMode === 'local') {
-                this.updateStatus('Mode local activé - Les deux joueurs peuvent jouer!');
+                this.updateStatus('Mode local activé - Les deux joueurs peuvent jouer!', 'success');
             } else {
-                this.updateStatus('Connecté au serveur');
+                this.updateStatus('Connecté au serveur', 'success');
             }
         });
 
         this.socket.on('playerJoined', (data) => {
             this.playerId = data.playerId;
             console.log('Joined as player:', this.playerId);
-            this.updateStatus('Vous avez rejoint la partie!');
+            this.updateStatus('Vous avez rejoint la partie!', 'success');
+            this.updatePlayerCount(1);
         });
 
         this.socket.on('gameState', (state) => {
@@ -254,34 +334,41 @@ class GameClient {
             }
 
             if (state.gameStarted && !state.winner) {
-                this.updateStatus('Partie en cours...');
-                document.getElementById('restartButton').style.display = 'none';
+                this.updateStatus('Partie en cours...', 'info');
+                this.hideRestartButton();
             } else if (state.winner) {
                 const isWinner = state.winner === this.playerId;
-                this.updateStatus(isWinner ? 'Vous avez gagné!' : 'Vous avez perdu');
-                document.getElementById('restartButton').style.display = 'block';
+                this.updateStatus(isWinner ? '🎉 Vous avez gagné!' : '😞 Vous avez perdu', isWinner ? 'success' : 'error');
+                this.showRestartButton();
+            }
+
+            // Update player count
+            if (state.players) {
+                this.updatePlayerCount(state.players.length);
             }
         });
 
         this.socket.on('gameReset', () => {
-            this.updateStatus('Nouvelle partie!');
-            document.getElementById('restartButton').style.display = 'none';
+            this.updateStatus('Nouvelle partie!', 'info');
+            this.hideRestartButton();
         });
 
         this.socket.on('playerConnected', () => {
-            this.updateStatus('Un joueur a rejoint la partie!');
+            this.updateStatus('Un joueur a rejoint la partie!', 'success');
         });
 
         this.socket.on('playerDisconnected', () => {
-            this.updateStatus('Un joueur s\'est déconnecté');
+            this.updateStatus('Un joueur s\'est déconnecté', 'warning');
+            this.updateConnectionStatus('Déconnecté');
         });
 
         this.socket.on('error', (data) => {
-            this.updateStatus('Erreur: ' + data.message);
+            this.updateStatus('Erreur: ' + data.message, 'error');
         });
 
         this.socket.on('disconnect', () => {
-            this.updateStatus('Déconnecté du serveur');
+            this.updateStatus('Déconnecté du serveur', 'error');
+            this.updateConnectionStatus('Déconnecté');
         });
     }
 
@@ -1017,10 +1104,16 @@ class GameClient {
         return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
     }
 
-    updateStatus(message) {
+    updateStatus(message, type = 'info') {
         const statusElement = document.getElementById('status');
         if (statusElement) {
             statusElement.textContent = message;
+
+            // Remove all status classes
+            statusElement.classList.remove('success', 'error', 'warning', 'info');
+
+            // Add new status class
+            statusElement.classList.add(type);
         }
     }
 
@@ -1030,7 +1123,7 @@ class GameClient {
 
         if (!scores || scores.length === 0) {
             scoreList.innerHTML = `
-                <div style="text-align: center; color: #aaa; padding: 20px;">
+                <div class="score-empty">
                     Aucun score pour le moment
                 </div>
             `;
@@ -1043,12 +1136,12 @@ class GameClient {
         scoreList.innerHTML = sortedScores.map((score, index) => {
             const playerClass = index === 0 ? 'player1' : 'player2';
             const isCurrentPlayer = score.playerId === this.playerId;
-            const highlight = isCurrentPlayer ? 'style="background: rgba(255, 215, 0, 0.2);"' : '';
+            const highlight = isCurrentPlayer ? 'style="background: rgba(255, 215, 0, 0.1); border-color: var(--warning-color);"' : '';
 
             return `
                 <div class="score-entry ${playerClass}" ${highlight}>
                     <div class="score-name">
-                        ${score.playerName} ${isCurrentPlayer ? '(Vous)' : ''}
+                        ${score.playerName} ${isCurrentPlayer ? '👤' : ''}
                     </div>
                     <div class="score-stats">
                         <span class="score-wins">V: ${score.wins}</span>
