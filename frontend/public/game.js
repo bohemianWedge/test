@@ -5,6 +5,7 @@ class GameClient {
         this.ctx = this.canvas.getContext('2d');
         this.socket = null;
         this.playerId = null;
+        this.playerIndex = null; // Track player index (0 or 1)
         this.gameState = null;
         this.inputState = {
             up: false,
@@ -45,6 +46,12 @@ class GameClient {
 
         this.socket.on('gameState', (state) => {
             this.gameState = state;
+
+            // Determine our player index (0 or 1)
+            if (this.playerId && state.players) {
+                this.playerIndex = state.players.findIndex(p => p.id === this.playerId);
+            }
+
             if (state.gameStarted && !state.winner) {
                 this.updateStatus('Partie en cours...');
             } else if (state.winner) {
@@ -82,57 +89,79 @@ class GameClient {
     }
 
     handleKeyEvent(e, isPressed) {
-        // Player 1 controls (WASD + E)
-        switch (e.key.toLowerCase()) {
-            case 'w':
-                this.inputState.up = isPressed;
-                break;
-            case 's':
-                this.inputState.down = isPressed;
-                break;
-            case 'a':
-                this.inputState.left = isPressed;
-                break;
-            case 'd':
-                this.inputState.right = isPressed;
-                break;
-            case 'e':
-                this.inputState.shoot = isPressed;
-                break;
+        // Only process keys if we know our player index
+        if (this.playerIndex === null) return;
+
+        let keyHandled = false;
+
+        // Player 1 controls (WASD + E) - index 0
+        if (this.playerIndex === 0) {
+            switch (e.key.toLowerCase()) {
+                case 'w':
+                    this.inputState.up = isPressed;
+                    keyHandled = true;
+                    break;
+                case 's':
+                    this.inputState.down = isPressed;
+                    keyHandled = true;
+                    break;
+                case 'a':
+                    this.inputState.left = isPressed;
+                    keyHandled = true;
+                    break;
+                case 'd':
+                    this.inputState.right = isPressed;
+                    keyHandled = true;
+                    break;
+                case 'e':
+                    this.inputState.shoot = isPressed;
+                    keyHandled = true;
+                    break;
+            }
         }
 
-        // Player 2 controls (Arrow keys + Enter)
-        switch (e.key) {
-            case 'ArrowUp':
-                this.inputState.up = isPressed;
-                e.preventDefault();
-                break;
-            case 'ArrowDown':
-                this.inputState.down = isPressed;
-                e.preventDefault();
-                break;
-            case 'ArrowLeft':
-                this.inputState.left = isPressed;
-                e.preventDefault();
-                break;
-            case 'ArrowRight':
-                this.inputState.right = isPressed;
-                e.preventDefault();
-                break;
-            case 'Enter':
-                this.inputState.shoot = isPressed;
-                e.preventDefault();
-                break;
+        // Player 2 controls (Arrow keys + Enter) - index 1
+        if (this.playerIndex === 1) {
+            switch (e.key) {
+                case 'ArrowUp':
+                    this.inputState.up = isPressed;
+                    keyHandled = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    this.inputState.down = isPressed;
+                    keyHandled = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                    this.inputState.left = isPressed;
+                    keyHandled = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    this.inputState.right = isPressed;
+                    keyHandled = true;
+                    e.preventDefault();
+                    break;
+                case 'Enter':
+                    this.inputState.shoot = isPressed;
+                    keyHandled = true;
+                    e.preventDefault();
+                    break;
+            }
         }
 
-        // Send input to server only on shoot press (not hold)
-        if (this.inputState.shoot && !this.lastShootState) {
-            this.sendInput();
-        } else if (!this.inputState.shoot) {
-            this.sendInput();
-        }
+        // Only send input if we handled a key
+        if (keyHandled) {
+            // Send input to server only on shoot press (not hold)
+            if (this.inputState.shoot && !this.lastShootState) {
+                this.sendInput();
+            } else if (!this.inputState.shoot) {
+                this.sendInput();
+            }
 
-        this.lastShootState = this.inputState.shoot;
+            this.lastShootState = this.inputState.shoot;
+        }
     }
 
     sendInput() {
