@@ -3,26 +3,21 @@ import {
   GameState,
   Player,
   Projectile,
-  Vector2,
   InputState,
-  Platform,
-  Button,
-  Door,
 } from './game.types';
 import { LEVELS } from './levels';
+import { GAME_CONFIG } from './game.config';
+import { PhysicsService } from './physics.service';
+import { CollisionService } from './collision.service';
 
 @Injectable()
 export class GameService {
   private gameState: GameState;
-  private readonly GRAVITY = 0.5;
-  private readonly JUMP_FORCE = -12;
-  private readonly MOVE_SPEED = 5;
-  private readonly PROJECTILE_SPEED = 8;
-  private readonly GAME_WIDTH = 800;
-  private readonly GAME_HEIGHT = 600;
-  private readonly UPDATE_RATE = 1000 / 60; // 60 FPS
 
-  constructor() {
+  constructor(
+    private physicsService: PhysicsService,
+    private collisionService: CollisionService,
+  ) {
     this.initializeGame();
   }
 
@@ -38,7 +33,7 @@ export class GameService {
 
   addPlayer(socketId: string): Player {
     const playerCount = this.gameState.players.size;
-    if (playerCount >= 2) {
+    if (playerCount >= GAME_CONFIG.MAX_PLAYERS) {
       return null;
     }
 
@@ -50,15 +45,19 @@ export class GameService {
       direction: playerCount === 0 ? 'right' : 'left',
       spawnPoint: { x: spawnPoint.x, y: spawnPoint.y },
       isGrounded: false,
-      width: 30,
-      height: 40,
+      width: GAME_CONFIG.PLAYER_WIDTH,
+      height: GAME_CONFIG.PLAYER_HEIGHT,
       hasFinished: false,
-      color: playerCount === 0 ? '#FF4444' : '#4444FF',
+      color: GAME_CONFIG.PLAYER_COLORS[playerCount],
+      currentPlatformType: 'neutral',
+      lastDamageTime: 0,
+      isInvincible: false,
+      effects: [],
     };
 
     this.gameState.players.set(socketId, player);
 
-    if (this.gameState.players.size === 2) {
+    if (this.gameState.players.size === GAME_CONFIG.MAX_PLAYERS) {
       this.gameState.gameStarted = true;
     }
 
@@ -67,7 +66,7 @@ export class GameService {
 
   removePlayer(socketId: string) {
     this.gameState.players.delete(socketId);
-    if (this.gameState.players.size < 2) {
+    if (this.gameState.players.size < GAME_CONFIG.MAX_PLAYERS) {
       this.gameState.gameStarted = false;
     }
   }
@@ -78,20 +77,16 @@ export class GameService {
 
     // Horizontal movement
     if (input.left) {
-      player.velocity.x = -this.MOVE_SPEED;
-      player.direction = 'left';
+      this.physicsService.applyMovement(player, 'left');
     } else if (input.right) {
-      player.velocity.x = this.MOVE_SPEED;
-      player.direction = 'right';
+      this.physicsService.applyMovement(player, 'right');
     } else {
       player.velocity.x = 0;
     }
 
     // Jumping
-    if (input.up && player.isGrounded) {
-      player.velocity.y = this.JUMP_FORCE;
-      player.isGrounded = false;
-      player.direction = 'up';
+    if (input.up) {
+      this.physicsService.applyJump(player);
     }
 
     // Shooting
@@ -106,24 +101,25 @@ export class GameService {
   }
 
   private shootProjectile(player: Player, input: InputState) {
-    // Check if player can shoot (limit projectiles)
+    // Check projectile limit
     const playerProjectiles = this.gameState.projectiles.filter(
-      (p) => p.playerId === player.id && p.active
+      (p) => p.playerId === player.id && p.active,
     );
-    if (playerProjectiles.length >= 3) return;
-
-    let velocityX = 0;
-    let velocityY = 0;
-
-    // Determine projectile direction
-    if (input.up && input.shoot) {
-      velocityY = -this.PROJECTILE_SPEED;
-    } else if (input.down && input.shoot) {
-      velocityY = this.PROJECTILE_SPEED;
-    } else {
-      // Shoot in facing direction
-      velocityX = player.direction === 'right' ? this.PROJECTILE_SPEED : -this.PROJECTILE_SPEED;
+    if (playerProjectiles.length >= GAME_CONFIG.MAX_PROJECTILES_PER_PLAYER) {
+      return;
     }
+
+    // Determine direction
+    let direction: 'up' | 'down' | 'left' | 'right';
+    if (input.up && input.shoot) {
+      direction = 'up';
+    } else if (input.down && input.shoot) {
+      direction = 'down';
+    } else {
+      direction = player.direction === 'right' ? 'right' : 'left';
+    }
+
+    const velocity = this.physicsService.calculateProjectileVelocity(direction);
 
     const projectile: Projectile = {
       id: `${player.id}-${Date.now()}`,
@@ -132,9 +128,9 @@ export class GameService {
         x: player.position.x + player.width / 2,
         y: player.position.y + player.height / 2,
       },
-      velocity: { x: velocityX, y: velocityY },
+      velocity,
       active: true,
-      radius: 5,
+      radius: GAME_CONFIG.PROJECTILE_RADIUS,
     };
 
     this.gameState.projectiles.push(projectile);
@@ -157,6 +153,12 @@ export class GameService {
     this.updateButtons();
     this.updateDoors();
 
+    // Apply platform effects
+    this.applyPlatformEffects();
+
+    // Update player effects
+    this.updatePlayerEffects();
+
     // Check win condition
     this.checkWinCondition();
 
@@ -165,124 +167,85 @@ export class GameService {
 
   private updatePlayer(player: Player) {
     // Apply gravity
-    player.velocity.y += this.GRAVITY;
+    this.physicsService.applyGravity(player);
 
     // Update position
-    player.position.x += player.velocity.x;
-    player.position.y += player.velocity.y;
+    this.physicsService.updatePosition(player);
+
+    // Reset grounded state and platform type
+    player.isGrounded = false;
+    player.currentPlatformType = 'neutral';
 
     // Check platform collisions
-    player.isGrounded = false;
     this.gameState.level.platforms.forEach((platform) => {
-      this.checkPlatformCollision(player, platform);
+      const collision = this.collisionService.checkPlatformCollision(
+        player,
+        platform,
+      );
+      if (collision.collided) {
+        this.collisionService.resolvePlatformCollision(
+          player,
+          platform,
+          collision.side,
+        );
+      }
     });
 
     // Check door collisions
     this.gameState.level.doors.forEach((door) => {
-      if (!door.open) {
-        this.checkDoorCollision(player, door);
+      if (!door.open && this.collisionService.checkDoorCollision(player, door)) {
+        this.collisionService.resolveDoorCollision(player, door);
       }
     });
 
     // Keep player in bounds
-    if (player.position.x < 0) player.position.x = 0;
-    if (player.position.x + player.width > this.GAME_WIDTH) {
-      player.position.x = this.GAME_WIDTH - player.width;
-    }
-    if (player.position.y > this.GAME_HEIGHT) {
+    this.physicsService.keepInBounds(player);
+
+    // Check if fell out of world
+    if (player.position.y > GAME_CONFIG.HEIGHT) {
       this.respawnPlayer(player);
     }
   }
 
-  private checkPlatformCollision(player: Player, platform: Platform) {
-    if (
-      player.position.x < platform.x + platform.width &&
-      player.position.x + player.width > platform.x &&
-      player.position.y < platform.y + platform.height &&
-      player.position.y + player.height > platform.y
-    ) {
-      // Check if player is falling onto platform
-      if (player.velocity.y > 0 && player.position.y + player.height - player.velocity.y <= platform.y) {
-        player.position.y = platform.y - player.height;
-        player.velocity.y = 0;
-        player.isGrounded = true;
-      }
-      // Bottom collision
-      else if (player.velocity.y < 0 && player.position.y >= platform.y + platform.height) {
-        player.position.y = platform.y + platform.height;
-        player.velocity.y = 0;
-      }
-      // Side collisions
-      else if (player.velocity.x > 0) {
-        player.position.x = platform.x - player.width;
-      } else if (player.velocity.x < 0) {
-        player.position.x = platform.x + platform.width;
-      }
-    }
-  }
-
-  private checkDoorCollision(player: Player, door: Door) {
-    if (
-      player.position.x < door.x + door.width &&
-      player.position.x + player.width > door.x &&
-      player.position.y < door.y + door.height &&
-      player.position.y + player.height > door.y
-    ) {
-      // Push player back
-      if (player.velocity.x > 0) {
-        player.position.x = door.x - player.width;
-      } else if (player.velocity.x < 0) {
-        player.position.x = door.x + door.width;
-      }
-    }
-  }
-
   private updateProjectiles() {
-    this.gameState.projectiles = this.gameState.projectiles.filter((projectile) => {
-      if (!projectile.active) return false;
+    this.gameState.projectiles = this.gameState.projectiles.filter(
+      (projectile) => {
+        if (!projectile.active) return false;
 
-      // Update position
-      projectile.position.x += projectile.velocity.x;
-      projectile.position.y += projectile.velocity.y;
+        // Update position
+        projectile.position.x += projectile.velocity.x;
+        projectile.position.y += projectile.velocity.y;
 
-      // Check bounds
-      if (
-        projectile.position.x < 0 ||
-        projectile.position.x > this.GAME_WIDTH ||
-        projectile.position.y < 0 ||
-        projectile.position.y > this.GAME_HEIGHT
-      ) {
-        return false;
-      }
+        // Check bounds
+        if (this.physicsService.isOutOfBounds(projectile.position)) {
+          return false;
+        }
 
-      // Check player collisions
-      this.gameState.players.forEach((player) => {
-        if (player.id !== projectile.playerId) {
-          const dx = projectile.position.x - (player.position.x + player.width / 2);
-          const dy = projectile.position.y - (player.position.y + player.height / 2);
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < projectile.radius + player.width / 2) {
+        // Check player collisions
+        this.gameState.players.forEach((player) => {
+          if (
+            player.id !== projectile.playerId &&
+            !player.isInvincible &&
+            this.collisionService.checkProjectilePlayerCollision(
+              projectile,
+              player,
+            )
+          ) {
             projectile.active = false;
             this.respawnPlayer(player);
           }
-        }
-      });
+        });
 
-      return projectile.active;
-    });
+        return projectile.active;
+      },
+    );
   }
 
   private updateButtons() {
     this.gameState.level.buttons.forEach((button) => {
       button.pressed = false;
       this.gameState.players.forEach((player) => {
-        if (
-          player.position.x < button.x + button.width &&
-          player.position.x + player.width > button.x &&
-          player.position.y < button.y + button.height &&
-          player.position.y + player.height > button.y
-        ) {
+        if (this.collisionService.checkButtonCollision(player, button)) {
           button.pressed = true;
         }
       });
@@ -299,18 +262,81 @@ export class GameService {
     });
   }
 
+  private applyPlatformEffects() {
+    const currentTime = Date.now();
+
+    this.gameState.players.forEach((player) => {
+      if (!player.isGrounded) return;
+
+      switch (player.currentPlatformType) {
+        case 'fire':
+          // Apply fire damage with cooldown
+          if (
+            !player.isInvincible &&
+            currentTime - player.lastDamageTime > GAME_CONFIG.FIRE_DAMAGE_COOLDOWN
+          ) {
+            player.lastDamageTime = currentTime;
+            // Add visual effect (will be rendered on client)
+            this.addPlayerEffect(player, 'burning', 500);
+          }
+          break;
+
+        case 'water':
+          // Slow down player
+          this.addPlayerEffect(player, 'slowed', 100);
+          break;
+
+        case 'ice':
+          // Make player slide (handled in physics service)
+          break;
+      }
+    });
+  }
+
+  private addPlayerEffect(
+    player: Player,
+    type: 'burning' | 'slowed' | 'frozen' | 'invincible',
+    duration: number,
+  ) {
+    if (!player.effects) {
+      player.effects = [];
+    }
+
+    // Remove existing effect of same type
+    player.effects = player.effects.filter((e) => e.type !== type);
+
+    // Add new effect
+    player.effects.push({
+      type,
+      duration,
+      startTime: Date.now(),
+    });
+  }
+
+  private updatePlayerEffects() {
+    const currentTime = Date.now();
+
+    this.gameState.players.forEach((player) => {
+      if (!player.effects) return;
+
+      // Remove expired effects
+      player.effects = player.effects.filter((effect) => {
+        return currentTime - effect.startTime < effect.duration;
+      });
+
+      // Update invincibility status
+      player.isInvincible = player.effects.some((e) => e.type === 'invincible');
+    });
+  }
+
   private checkWinCondition() {
-    this.gameState.players.forEach((player, index) => {
-      const goalIndex = Array.from(this.gameState.players.keys()).indexOf(player.id);
+    this.gameState.players.forEach((player) => {
+      const goalIndex = Array.from(this.gameState.players.keys()).indexOf(
+        player.id,
+      );
       const goal = this.gameState.level.goals[goalIndex];
 
-      if (
-        goal &&
-        player.position.x < goal.x + goal.width &&
-        player.position.x + player.width > goal.x &&
-        player.position.y < goal.y + goal.height &&
-        player.position.y + player.height > goal.y
-      ) {
+      if (goal && this.collisionService.checkGoalCollision(player, goal)) {
         player.hasFinished = true;
         if (!this.gameState.winner) {
           this.gameState.winner = player.id;
@@ -324,6 +350,8 @@ export class GameService {
     player.position.y = player.spawnPoint.y;
     player.velocity.x = 0;
     player.velocity.y = 0;
+    player.isInvincible = true;
+    this.addPlayerEffect(player, 'invincible', GAME_CONFIG.RESPAWN_INVINCIBILITY);
   }
 
   getGameState(): GameState {
